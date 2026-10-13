@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ghost Body Studio</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Cpath d=%22M8 3l-5 3 2 5 2-1v11h10V10l2 1 2-5-5-3c-.5 1.7-2 3-4 3s-3.5-1.3-4-3z%22 fill=%22%23c2185b%22/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M8 3l-5 3 2 5 2-1v11h10V10l2 1 2-5-5-3c-.5 1.7-2 3-4 3s-3.5-1.3-4-3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </span>
+      <div>
+        <h1>Ghost Body Studio</h1>
+        <p class="sub">샘플 사진 → 앞·옆·뒤 고스트 바디 이미지</p>
+      </div>
+    </div>
+    <button class="btn ghost" id="guideBtn" type="button">촬영 가이드</button>
+  </header>
+
+  <main class="wrap">
+    <!-- 1. Style info -->
+    <section class="panel">
+      <h2><span class="step">1</span>스타일 정보 · 출력 설정</h2>
+      <div class="grid-form">
+        <label>Style # <em>*</em>
+          <input id="styleNo" placeholder="119377" autocomplete="off" />
+        </label>
+        <label>Color Code <em>*</em>
+          <input id="colorCode" placeholder="4BH" autocomplete="off" />
+        </label>
+        <label>파일 형식
+          <select id="fmt">
+            <option value="jpg">JPG</option>
+            <option value="png">PNG</option>
+          </select>
+        </label>
+        <label>이미지 크기 (px)
+          <select id="size">
+            <option value="1000">1000</option>
+            <option value="1500">1500</option>
+            <option value="2000" selected>2000</option>
+            <option value="2500">2500</option>
+          </select>
+        </label>
+        <label>비율
+          <select id="ratio">
+            <option value="1:1">정사각 1:1</option>
+            <option value="3:4">세로 3:4</option>
+            <option value="4:5">세로 4:5</option>
+          </select>
+        </label>
+        <label>최대 파일 크기 (MB)
+          <input id="maxMB" type="number" min="0.5" max="20" step="0.5" value="5" />
+        </label>
+      </div>
+      <div class="opts">
+        <label class="chk"><input type="checkbox" id="sameScale" checked /> 3컷 동일 배율 (실제 크기 비율 유지)</label>
+        <label class="chk"><input type="checkbox" id="shadow" /> 은은한 그림자</label>
+        <label class="chk"><input type="checkbox" id="transparent" /> 투명 배경 (PNG만)</label>
+        <label class="inline">여백
+          <input type="range" id="padding" min="2" max="18" value="7" /> <span id="paddingVal">7%</span>
+        </label>
+      </div>
+      <p class="hint">파일명 규칙: <code id="namePreview">Style#-ColorCode-Front</code></p>
+    </section>
+
+    <!-- 2. Upload -->
+    <section class="panel">
+      <h2><span class="step">2</span>샘플 사진 업로드 <small>드레스폼에 입힌 사진 · 각도별 1장</small></h2>
+      <div class="views" id="views"></div>
+    </section>
+
+    <!-- 3. Output -->
+    <section class="panel">
+      <h2><span class="step">3</span>결과 · 다운로드</h2>
+      <div class="sheet-wrap">
+        <canvas id="sheet" class="sheet"></canvas>
+        <p id="sheetEmpty" class="empty">사진을 올리면 앞·옆·뒤 합본 미리보기가 여기에 표시됩니다.</p>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="dlAll" type="button" disabled>전체 ZIP 다운로드 (3컷 + 합본)</button>
+        <button class="btn" id="dlSheet" type="button" disabled>합본만 다운로드</button>
+        <span id="dlInfo" class="muted"></span>
+      </div>
+    </section>
+  </main>
+
+  <!-- Editor -->
+  <div class="modal" id="editor" hidden>
+    <div class="editor">
+      <div class="ed-head">
+        <strong id="edTitle">편집</strong>
+        <div class="ed-head-actions">
+          <button class="btn" id="edUndo" type="button" title="Ctrl+Z">되돌리기</button>
+          <button class="btn primary" id="edDone" type="button">완료</button>
+        </div>
+      </div>
+      <div class="ed-body">
+        <aside class="tools">
+          <div class="tool-group">
+            <h4>자동</h4>
+            <button class="btn block" id="edAutoBody" type="button">바디 자동 제거</button>
+            <button class="btn block" id="edAutoNeck" type="button">목 안쪽 자동 채우기</button>
+          </div>
+          <div class="tool-group">
+            <h4>도구</h4>
+            <div class="toolset" id="toolset">
+              <button data-tool="wand" class="tool on" type="button" title="클릭한 곳과 비슷한 색의 연결된 영역 지우기">마술봉 지우기</button>
+              <button data-tool="erase" class="tool" type="button">지우개</button>
+              <button data-tool="restore" class="tool" type="button" title="원본 사진 픽셀로 되살리기">복원 브러시</button>
+              <button data-tool="fill" class="tool" type="button" title="목 안쪽 안감 색으로 칠하기">안감 브러시</button>
+              <button data-tool="pickBody" class="tool wide" type="button">바디 색 찍기 (스포이트)</button>
+              <button data-tool="pickInner" class="tool wide" type="button">안감 색 찍기 (스포이트)</button>
+            </div>
+          </div>
+          <div class="tool-group">
+            <label><span>브러시 크기 <b id="brushVal">30</b>px <small>([ ] 키)</small></span>
+              <input type="range" id="brush" min="3" max="200" value="30" />
+            </label>
+            <label><span>허용 오차 <b id="tolVal">22</b> <small>(클수록 넓게 지움)</small></span>
+              <input type="range" id="tol" min="5" max="60" value="22" />
+            </label>
+            <div class="swatches">
+              <span>바디 색 <i id="swBody"></i></span>
+              <span>안감 색 <i id="swInner"></i></span>
+            </div>
+          </div>
+          <div class="tool-group">
+            <h4>보기 · 기타</h4>
+            <div class="row">
+              <button class="btn sm" id="zoomOut" type="button">－</button>
+              <button class="btn sm" id="zoomFit" type="button">맞춤</button>
+              <button class="btn sm" id="zoomIn" type="button">＋</button>
+            </div>
+            <label class="chk"><input type="checkbox" id="edChecker" checked /> 투명 영역 체크무늬</label>
+            <button class="btn block" id="edFlip" type="button">좌우 반전</button>
+            <button class="btn block" id="edReset" type="button">배경 제거 직후로 초기화</button>
+          </div>
+          <p class="tip">팁: 바디가 남아 있으면 <b>마술봉</b>으로 클릭, 옷이 지워졌으면 <b>복원 브러시</b>로 문지르세요. Ctrl+Z 되돌리기.</p>
+        </aside>
+        <div class="stage" id="stage">
+          <canvas id="edCanvas"></canvas>
+          <div class="cursor" id="cursor" hidden></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Guide -->
+  <div class="modal" id="guide" hidden>
+    <div class="guide">
+      <div class="ed-head"><strong>촬영 가이드</strong><button class="btn" id="guideClose" type="button">닫기</button></div>
+      <ol>
+        <li><b>배경</b>: 옷·바디와 대비되는 단색 벽/페이퍼 (흰 옷이면 회색·진한 배경).</li>
+        <li><b>거리·높이 고정</b>: 앞·옆·뒤 모두 같은 위치·높이에서 촬영 (삼각대 권장). 바디만 돌리세요.</li>
+        <li><b>프레임</b>: 옷 전체 + 바디 목 윗부분이 화면 안에 다 들어오게. 위아래 여백 조금.</li>
+        <li><b>조명</b>: 정면 양쪽에서 고르게, 강한 그림자 없이. 플래시 직광 X.</li>
+        <li><b>옷 정리</b>: 단추 모두 잠그고 칼라·소매·밑단 주름 정리. 핀은 뒤에서 안 보이게.</li>
+        <li><b>옆면</b>: 항상 같은 방향(예: 왼쪽 옆)으로. 다르면 편집에서 <i>좌우 반전</i>.</li>
+        <li><b>바디 색</b>: Alvaform 내추럴 베이지는 자동 제거됨. 옷이 베이지·아이보리 계열이면 브러시로 마무리 필요.</li>
+      </ol>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
